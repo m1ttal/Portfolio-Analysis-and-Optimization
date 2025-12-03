@@ -1,0 +1,13 @@
+tickers:
+  - HCLTECH.NS
+  - AXISBANK.NS
+  - RELIANCE.NS
+  - BHARTIARTL.NS
+  - SUNPHARMA.NS
+
+benchmark: "^NSEI"
+years: 5
+
+paths:
+  processed: "./data/processed"
+  metadata: "./data/metadata"
