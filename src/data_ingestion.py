@@ -38,7 +38,6 @@ def clean_outliers(df):
     
     Returns:
         cleaned_df (pd.DataFrame): DataFrame with outliers replaced.
-        total_outliers (int): Total number of outliers corrected.
         outlier_details (dict): Number of outliers per column.
     """
     z_scores = (df - df.mean()) / df.std()
