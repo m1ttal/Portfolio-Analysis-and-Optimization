@@ -1,124 +1,103 @@
 """
-DATA INGESTION PIPELINE
+DATA INGESTION & CLEANING PIPELINE
 
 This script retrieves historical adjusted closing prices for selected stocks and a benchmark index using Yahoo Finance. 
 It performs automated data validation by detecting and correcting outliers via Z-score filtering and handling missing values 
 through forward-filling. 
 
-The cleaned datasets are exported as processed CSV files, and a metadata JSON file is generated to capture configuration inputs, 
-software environment details, cleaning statistics, and data quality metrics. This ensures full reproducibility and prepares the 
-data for subsequent financial modeling, risk analysis, and portfolio optimization workflows.
+- Fetches adjusted close prices via Yahoo Finance
+- Forward-fills missing values
+- Removes extreme outliers using Z-score
+- Returns clean stock & benchmark data with metadata
 """
 
-import os
-import json
+from pathlib import Path
 import datetime
 import platform
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import yfinance as yf
 import yaml
 
-# Load YAML config
-with open("config/config.yaml", "r") as f:
+# Configuration
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = BASE_DIR / "config" / "config.yaml"
+
+with open(CONFIG_PATH, "r") as f:
     cfg = yaml.safe_load(f)
 
-TICKERS   = cfg["tickers"]
+TICKERS = cfg["tickers"]
 BENCHMARK = cfg["benchmark"]
-YEARS     = cfg["years"]
-PATHS     = cfg["paths"]
+YEARS = cfg["years"]
 
-# function to clean outliers
-def clean_outliers(df):
-    """
-    Detects outliers using Z-score method and replaces them with forward-filled values.
-    
-    Args:
-        df (pd.DataFrame): DataFrame containing price data.
-    
-    Returns:
-        cleaned_df (pd.DataFrame): DataFrame with outliers replaced.
-        outlier_details (dict): Number of outliers per column.
-    """
-    z_scores = (df - df.mean()) / df.std()
-    mask = np.abs(z_scores) > 3
-    outlier_details = mask.sum(axis=0).to_dict()
-    
-    cleaned_df = df.where(~mask, np.nan).ffill()
-    return cleaned_df, {k: int(v) for k, v in outlier_details.items()}
+# Data Cleaning Utilities
 
-# Main data ingestion pipeline
+def clean_outliers(df: pd.DataFrame, z_thresh: float = 3.0):
+    """
+    Replace extreme Z-score outliers with forward-filled values.
+    """
+    z = (df - df.mean()) / df.std()
+    mask = z.abs() > z_thresh
+
+    outlier_count = mask.sum().to_dict()
+
+    return df.mask(mask).ffill(), outlier_count
+
+
+def clean_prices(df: pd.DataFrame):
+    """
+    Apply standard cleaning steps:
+    - Forward-fill missing values
+    - Remove outliers
+    """
+    missing_before = int(df.isna().sum().sum())
+
+    df = df.ffill()
+    df, outliers = clean_outliers(df)
+
+    return df, missing_before, outliers
+
+# Main Ingestion Function
+
 def fetch_data():
     """
-    Fetches adjusted close prices for tickers and benchmark,
-    cleans outliers, forward-fills missing values,
-    saves processed CSVs and metadata JSON.
-    
-    Returns:
-        stocks (pd.DataFrame): Cleaned stock data.
-        benchmark (pd.DataFrame): Cleaned benchmark data.
-        metadata (dict): Dictionary containing metadata of the run.
+    Fetch and clean historical adjusted close prices.
     """
-    # Download adjusted close prices
-    data = yf.download(TICKERS + [BENCHMARK], period=f"{YEARS}y", auto_adjust=True)['Close']
 
-    # Separate stock and benchmark data and forward-fill missing values
-    stocks = data[TICKERS].ffill()
-    benchmark = data[[BENCHMARK]].ffill()
-    missing_before = int(stocks.isna().sum().sum() + benchmark.isna().sum().sum())
+    # Download adjusted prices
+    prices = yf.download(
+        TICKERS + [BENCHMARK],
+        period=f"{YEARS}y",
+        auto_adjust=True,
+        progress=False
+    )["Close"]
 
-    # Clean outliers
-    stocks, details_stock = clean_outliers(stocks)
-    benchmark, details_bench = clean_outliers(benchmark)
-    total_outliers = sum(details_stock.values()) + sum(details_bench.values())
+    # Split stock and benchmark data
+    stocks_raw = prices[TICKERS]
+    benchmark_raw = prices[[BENCHMARK]]
 
-    
-    # Prepare file names with timestamp
-    timestamp = datetime.datetime.now().strftime("%Y%m%d")
-    stock_file = os.path.join(PATHS["processed"], f"stocks_adj_{timestamp}.csv")
-    benchmark_file = os.path.join(PATHS["processed"], f"benchmark_adj_{timestamp}.csv")
-    
-    # Save processed CSV files
-    stocks.to_csv(stock_file)
-    benchmark.to_csv(benchmark_file)
+    # Clean datasets
+    stocks, miss_s, out_s = clean_prices(stocks_raw)
+    benchmark, miss_b, out_b = clean_prices(benchmark_raw)
 
-    # Prepare metadata
+    # Metadata
     metadata = {
         "run_info": {
-            "timestamp": timestamp,
-            "python_version": platform.python_version(),
-            "yfinance_version": yf.__version__
+            "timestamp": datetime.datetime.now().isoformat(),
+            "python": platform.python_version(),
+            "yfinance": yf.__version__,
         },
-        "config": cfg,
         "data_summary": {
             "rows": len(stocks),
-            "start_date": str(stocks.index.min().date()),
-            "end_date": str(stocks.index.max().date()),
-            "missing_values_before_cleaning": missing_before,
-            "outliers_cleaned": int(total_outliers),
-            "outliers_detail": {
-                "stocks": details_stock,
-                "benchmark": details_bench
-            }
+            "date_range": (
+                str(stocks.index.min().date()),
+                str(stocks.index.max().date())
+            ),
+            "missing_values_before": miss_s + miss_b,
+            "outliers_cleaned": sum(out_s.values()) + sum(out_b.values()),
         },
-        "file_paths": {
-            "stocks_file": stock_file,
-            "benchmark_file": benchmark_file
-        }
     }
-    
-    # Save metadata JSON
-    metadata_file = os.path.join(PATHS["metadata"], f"metadata_{timestamp}.json")
-    with open(metadata_file, "w") as f:
-        json.dump(metadata, f, indent=4)
-    
+
     return stocks, benchmark, metadata
-
-# Execute pipeline
-if __name__ == "__main__":
-    stocks, benchmark, metadata = fetch_data()
-    print("Sample Stock Data:")
-    print(stocks.head())
-    print("\nSample Benchmark Data:")
-    print(benchmark.head())
-
