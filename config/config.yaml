@@ -7,7 +7,3 @@ tickers:
 
 benchmark: "^NSEI"
 years: 5
-
-paths:
-  processed: "./data/processed"
-  metadata: "./data/metadata"
