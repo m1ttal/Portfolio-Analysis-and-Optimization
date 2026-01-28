@@ -56,26 +56,25 @@ Statsmodels
 
 Environment: Jupyter Notebook
 
-Project Structure
+## Project Structure
 
 Portfolio-Analysis-and-Optimization/
 │
 ├── config/
-│   └── config.yaml                  # Tickers, benchmark, time horizon
+│ └── config.yaml # Tickers, benchmark, time horizon
 │
 ├── src/
-│   ├── data_ingestion.py             # Data fetching & cleaning pipeline
-│   └── portfolio_core.py             # Portfolio analytics & optimization
+│ ├── data_ingestion.py # Data fetching & cleaning pipeline
+│ └── portfolio_core.py # Portfolio analytics & optimization
 │
 ├── notebooks/
-│   └── Portfolio_Analysis&Optimization.ipynb
-│                                   # Main analysis notebook
+│ └── Portfolio_Analysis&Optimization.ipynb
+│ # Main analysis notebook
 │
 ├── reports/
-│   └── project_report/                      # Term Project Report in IEEE research paper format.
+│ └── project_report/ # Term Project Report in IEEE research paper format
 │
-├── requirements.txt                  # Python dependencies
-├── README.md                         # Project documentation
-├── LICENSE                           # MIT License
+├── requirements.txt # Python dependencies
+├── README.md # Project documentation
+├── LICENSE # MIT License
 └── .gitignore
-
