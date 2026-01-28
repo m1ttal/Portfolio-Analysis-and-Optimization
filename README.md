@@ -58,6 +58,7 @@ Environment: Jupyter Notebook
 
 ## Project Structure
 
+```
 Portfolio-Analysis-and-Optimization/
 │
 ├── config/
@@ -78,3 +79,4 @@ Portfolio-Analysis-and-Optimization/
 ├── README.md # Project documentation
 ├── LICENSE # MIT License
 └── .gitignore
+```
